@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Equity Demo — Fresh Start</title>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{ --bg:#0f1724; --card:#0b1220; --muted:#9aa4b2; --accent:#38bdf8; --glass: rgba(255,255,255,0.03);} 
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin:0; background:linear-gradient(180deg,#071029 0%, #071a2a 100%); color:#e6eef6; padding:28px}
+    .container{max-width:1100px;margin:0 auto}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700}
+    h1{font-size:20px;margin:0}
+    .search-row{display:flex;gap:10px;align-items:center}
+    input[type="search"]{padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:var(--glass);color:inherit;outline:none;width:320px}
+    button{background:var(--accent);border:none;padding:10px 12px;border-radius:10px;color:#022;cursor:pointer}
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    .card h3{margin:0 0 6px 0}
+    .meta{color:var(--muted);font-size:13px;margin-bottom:8px}
+    .price{font-weight:700;font-size:18px}
+    .btn-row{display:flex;gap:8px;margin-top:10px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03)}
+    th{color:var(--muted);font-size:13px}
+    .topbar{display:flex;gap:8px;align-items:center}
+    .small{font-size:13px;color:var(--muted)}
+
+    /* Modal */
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:linear-gradient(rgba(2,6,23,0.6), rgba(2,6,23,0.85));backdrop-filter:blur(6px);z-index:50}
+    .modal.open{display:flex}
+    .modal-content{width:880px;max-width:94%;background:var(--card);padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.04)}
+    .modal-head{display:flex;justify-content:space-between;align-items:center}
+    .close{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:6px 8px;border-radius:8px;color:var(--muted);cursor:pointer}
+
+    @media (max-width:760px){.grid{grid-template-columns:1fr}.search-row{flex-direction:column;align-items:flex-start}input[type="search"]{width:100%}.brand h1{font-size:18px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo">ED</div>
+        <div>
+          <h1>Equity Demo — Fresh Start</h1>
+          <div class="small">A simple local prototype to learn HTML/CSS/JS</div>
+        </div>
+      </div>
+
+      <div class="topbar">
+        <div class="search-row">
+          <input id="search" type="search" placeholder="Search ticker or company name (e.g. INFY, Reliance)..." />
+          <button id="exportCsv">Export CSV</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="grid" id="companyGrid">
+        <!-- Company cards injected here by JS -->
+      </section>
+
+      <section class="card" style="margin-top:16px">
+        <h3>All companies — quick table</h3>
+        <div class="meta">Click "View" in a row to open details and a mini chart.</div>
+        <div style="overflow:auto;max-height:260px;margin-top:8px">
+          <table id="companiesTable">
+            <thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Market Cap</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal for details -->
+    <div id="modal" class="modal" role="dialog" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-head">
+          <div>
+            <h3 id="modalTitle">Company Details</h3>
+            <div class="small" id="modalSub">Ticker • Sector</div>
+          </div>
+          <div>
+            <button class="close" id="closeModal">Close</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:18px;margin-top:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <canvas id="priceChart" height="160"></canvas>
+          </div>
+          <div style="flex:1;min-width:260px">
+            <h4>Key financials</h4>
+            <table style="width:100%"><tbody id="kf"></tbody></table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+<script>
+// --- SAMPLE DATA (replace with live API data later) ---
+const sampleCompanies = [
+  {ticker:'INFY', name:'Infosys Ltd', price:1500.34, marketCap:'~6.2T', sector:'IT Services', financials:{revenue:'1,23,456 Cr', profit:'18,234 Cr', roe:'24%'} , history: [1200,1250,1300,1280,1320,1380,1420,1400,1450,1500,1520,1500]},
+  {ticker:'RELI', name:'Reliance Industries', price:2800.10, marketCap:'~17.5T', sector:'Energy & Retail', financials:{revenue:'6,23,456 Cr', profit:'45,000 Cr', roe:'11%'}, history:[2500,2550,2600,2650,2700,2720,2680,2750,2800,2820,2790,2800]},
+  {ticker:'TCS', name:'Tata Consultancy Services', price:3400.20, marketCap:'~12.3T', sector:'IT Services', financials:{revenue:'2,00,000 Cr', profit:'36,000 Cr', roe:'30%'}, history:[3000,3050,3100,3150,3180,3220,3300,3350,3400,3420,3380,3400]},
+  {ticker:'HDFC', name:'HDFC Bank', price:1420.75, marketCap:'~9.4T', sector:'Banking', financials:{revenue:'1,10,000 Cr', profit:'22,000 Cr', roe:'15%'}, history:[1200,1250,1300,1280,1320,1380,1400,1420,1410,1430,1440,1420]}
+];
+
+// Utility to format currency-ish
+function fmt(x){ return typeof x === 'number' ? x.toLocaleString('en-IN',{maximumFractionDigits:2}) : x }
+
+// Render cards
+const grid = document.getElementById('companyGrid');
+const tbody = document.querySelector('#companiesTable tbody');
+function render(companies){
+  grid.innerHTML = '';
+  tbody.innerHTML = '';
+  companies.forEach(c=>{
+    // Card
+    const card = document.createElement('div'); card.className='card';
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3>${c.name}</h3>
+          <div class="meta">${c.ticker} • ${c.sector}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="price">₹ ${fmt(c.price)}</div>
+          <div class="small">${c.marketCap}</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button data-ticker="${c.ticker}" class="viewBtn">View</button>
+        <button class="small" onclick="alert('Add to watchlist: ${c.ticker}')">Add to watch</button>
+      </div>
+    `;
+    grid.appendChild(card);
+
+    // Table row
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${c.ticker}</td><td>${c.name}</td><td>₹ ${fmt(c.price)}</td><td>${c.marketCap}</td><td><button data-ticker="${c.ticker}" class="viewBtn">View</button></td>`;
+    tbody.appendChild(tr);
+  })
+
+  // bind view buttons
+  document.querySelectorAll('.viewBtn').forEach(b=>b.addEventListener('click',openModal))
+}
+
+render(sampleCompanies);
+
+// Search
+const search = document.getElementById('search');
+search.addEventListener('input',()=>{
+  const q = search.value.trim().toLowerCase();
+  const filtered = sampleCompanies.filter(c => c.ticker.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.sector.toLowerCase().includes(q));
+  render(filtered);
+});
+
+// Modal & chart
+const modal = document.getElementById('modal');
+const modalTitle = document.getElementById('modalTitle');
+const modalSub = document.getElementById('modalSub');
+const kf = document.getElementById('kf');
+let chartInstance = null;
+
+function openModal(e){
+  const ticker = e.currentTarget.dataset.ticker;
+  const comp = sampleCompanies.find(x=>x.ticker===ticker);
+  if(!comp) return;
+  modalTitle.textContent = comp.name + ' — ₹' + fmt(comp.price);
+  modalSub.textContent = comp.ticker + ' • ' + comp.sector;
+  kf.innerHTML = `
+    <tr><th>Revenue</th><td>${comp.financials.revenue}</td></tr>
+    <tr><th>Profit</th><td>${comp.financials.profit}</td></tr>
+    <tr><th>ROE</th><td>${comp.financials.roe}</td></tr>
+  `;
+
+  // draw chart
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  if(chartInstance) { chartInstance.destroy(); chartInstance = null }
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: comp.history.map((v,i)=>`M-${comp.history.length-i}`),
+      datasets: [{label: comp.ticker + ' price', data: comp.history, tension:0.25, fill:false}]
+    },
+    options: {plugins:{legend:{display:false}},scales:{y:{beginAtZero:false}}
+    }
+  });
+
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden','false');
+}
+
+document.getElementById('closeModal').addEventListener('click',()=>{
+  modal.classList.remove('open'); modal.setAttribute('aria-hidden','true');
+});
+modal.addEventListener('click',(ev)=>{ if(ev.target===modal) { modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); } })
+
+// CSV Export
+function exportCSV(){
+  const rows = [ ['Ticker','Company','Price','Market Cap','Sector'] ];
+  sampleCompanies.forEach(c=> rows.push([c.ticker,c.name,c.price,c.marketCap,c.sector]));
+  const csv = rows.map(r=>r.map(cell=>`"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='equity-demo-data.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+document.getElementById('exportCsv').addEventListener('click', exportCSV);
+
+</script>
+
+</body>
+</html>
